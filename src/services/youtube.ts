@@ -34,6 +34,16 @@ async function getClient(): Promise<YTMusic | null> {
   return ytMusic;
 }
 
+function normalizeText(text: string): string {
+  return text.toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, ' ').trim();
+}
+
+function titleMatches(title1: string, title2: string): boolean {
+  const t1 = normalizeText(title1);
+  const t2 = normalizeText(title2);
+  return t1 === t2 || t1.includes(t2) || t2.includes(t1);
+}
+
 function parseArtist(track: any): string {
   if (track.artist) {
     if (typeof track.artist === 'string') return track.artist;
@@ -63,23 +73,38 @@ function parseArtist(track: any): string {
   return 'Unknown Artist';
 }
 
-export async function searchYouTubeMusic(query: string, limit: number = 10): Promise<Song[]> {
+function artistContains(trackArtist: string, searchArtist: string): boolean {
+  const a1 = normalizeText(trackArtist);
+  const a2 = normalizeText(searchArtist);
+  if (!a1 || !a2) return false;
+  return a1 === a2 || a1.includes(a2) || a2.includes(a1);
+}
+
+export async function searchYouTubeMusic(query: string, songTitle?: string, artistName?: string, limit: number = 10): Promise<Song[]> {
   try {
     const client = await getClient();
     if (!client) return [];
 
-    const searchPromise = client.searchSongs(query);
+    const searchPromise = client.search(query);
     const timeoutPromise = new Promise<null>((_, reject) => 
       setTimeout(() => reject(new Error('YouTube Music search timeout')), 5000)
     );
 
     const results = await Promise.race([searchPromise, timeoutPromise]) as any[];
 
-    if (!results || !Array.isArray(results)) return [];
+    if (!results || !Array.isArray(results)) {
+      console.log(`YouTube Music: No results returned`);
+      return [];
+    }
 
-    console.log(`YouTube Music found ${results.length} songs for "${query}"`);
+    console.log(`YouTube Music: search() returned ${results.length} results`);
 
-    return results.slice(0, limit).map((track): Song => {
+    const songs = results.filter((result: any) => {
+      const isSong = result.type === 'song' || result.wrapperType === 'track' || result.videoId;
+      return isSong;
+    });
+    
+    const mappedSongs = songs.map((track: any): Song => {
       const title = track.name || track.title || 'Unknown Title';
       const artist = parseArtist(track);
       const videoId = track.videoId || track.id;
@@ -99,6 +124,16 @@ export async function searchYouTubeMusic(query: string, limit: number = 10): Pro
         youtubeMusicUrl: url
       };
     });
+    
+    const filtered = mappedSongs.filter(song => {
+      const titleMatch = !songTitle || titleMatches(song.title, songTitle);
+      const artistMatch = !artistName || artistContains(song.artist, artistName);
+      return titleMatch && artistMatch;
+    });
+    
+    console.log(`YouTube Music found ${filtered.length} songs for "${query}"`);
+
+    return filtered.slice(0, limit);
   } catch (error) {
     console.error('YouTube Music search error:', error);
     return [];

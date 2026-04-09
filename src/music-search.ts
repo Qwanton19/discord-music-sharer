@@ -52,7 +52,7 @@ export async function searchSong(
       console.error('Spotify search error:', e);
       return [];
     }),
-    searchYouTubeMusic(artistName ? `${songTitle} ${artistName}` : songTitle).catch(e => {
+    searchYouTubeMusic(artistName ? `${songTitle} ${artistName}` : songTitle, songTitle, artistName).catch(e => {
       console.error('YouTube Music search error:', e);
       return [];
     }),
@@ -99,7 +99,12 @@ function artistsMatch(artist1: string, artist2: string): boolean {
   
   if (a1 === a2) return true;
   
-  if (a1.includes(a2) || a2.includes(a1)) return true;
+  const hasCollaborator1 = artist1.toLowerCase().includes(',') || artist1.toLowerCase().includes('feat');
+  const hasCollaborator2 = artist2.toLowerCase().includes(',') || artist2.toLowerCase().includes('feat');
+  
+  if (hasCollaborator1 || hasCollaborator2) {
+    if (a1.includes(a2) || a2.includes(a1)) return true;
+  }
   
   const variations: Record<string, string[]> = {
     'rachel platten': ['rachel prancer'],
