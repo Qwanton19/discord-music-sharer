@@ -2,7 +2,6 @@ import { Song, MusicService } from './types';
 import { searchSpotify } from './services/spotify';
 import { searchYouTubeMusic } from './services/youtube';
 import { searchAppleMusic } from './services/apple';
-import Fuse from 'fuse.js';
 
 interface CachedSearch {
   songs: Song[];
@@ -209,19 +208,19 @@ function mergeSongUrls(target: Song, source: Song): void {
 function scoreResults(songs: Song[], songTitle: string, artistName?: string): Song[] {
   if (songs.length === 0) return [];
 
-  const fuse = new Fuse(songs, {
-    keys: [
-      { name: 'title', weight: 0.6 },
-      { name: 'artist', weight: 0.4 }
-    ],
-    threshold: 0.4,
-    includeScore: true
+  const withPlatformCount = songs.map(song => ({
+    song,
+    platforms: [song.spotifyUrl, song.youtubeMusicUrl, song.appleMusicUrl].filter(Boolean).length
+  }));
+
+  withPlatformCount.sort((a, b) => {
+    if (b.platforms !== a.platforms) return b.platforms - a.platforms;
+    const aExact = normalizeForMerge(a.song.title) === normalizeForMerge(songTitle);
+    const bExact = normalizeForMerge(b.song.title) === normalizeForMerge(songTitle);
+    if (aExact && !bExact) return -1;
+    if (!aExact && bExact) return 1;
+    return 0;
   });
 
-  const searchTerm = artistName ? `${songTitle} ${artistName}` : songTitle;
-  const results = fuse.search(searchTerm);
-  
-  return results
-    .map(r => r.item)
-    .concat(songs.filter(s => !results.find(r => r.item === s)));
+  return withPlatformCount.map(item => item.song);
 }
