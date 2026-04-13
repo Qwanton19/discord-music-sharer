@@ -175,9 +175,7 @@ function mergeAndDeduplicate(songs: Song[]): Song[] {
         if (partialTitleMatch && !exactTitleMatch) {
           if (artistsMatch(song.artist, existing.artist)) {
             console.log(`Merging partial title+artist match: "${song.title}" by ${song.artist} ~= ${existing.artist}`);
-            if (hasCleanTitle && !existingHasCleanTitle) {
-              existing.youtubeMusicUrl = song.youtubeMusicUrl;
-            }
+            mergeSongUrls(existing, song);
             foundMatch = true;
             break;
           }
